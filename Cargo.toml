@@ -1,0 +1,15 @@
+[package]
+name = "gmon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.20", features = ["derive"] }
+crossterm = { version = "0.28.1", features = ["event-stream"] }
+futures = "0.3.31"
+gitlab = "0.1705.0"
+graphql_client = "0.14.0"
+ratatui = "0.29.0"
+serde = "1.0.214"
+tokio = { version = "1.41.1", features = ["full"] }
+toml = "0.8.19"

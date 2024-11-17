@@ -1,0 +1,27 @@
+query JobsQuery($project: ID!, $git_ref: String, $amount: Int) {
+  project(fullPath: $project) {
+    id
+    fullPath
+
+    pipelines(first: $amount, ref: $git_ref) {
+      nodes {
+        id
+        name
+        ref
+        status
+
+        stages {
+          nodes {
+            name
+            jobs {
+              nodes {
+                name
+                status
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

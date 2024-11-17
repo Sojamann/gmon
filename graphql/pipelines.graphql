@@ -1,0 +1,9 @@
+query BranchPipelinesQuery($project: ID!, $branch: String!, $amount: Int!) {
+  project(fullPath: $project) {
+    pipelines(first: $amount, ref: $branch) {
+      nodes {
+        status
+      }
+    }
+  }
+}
