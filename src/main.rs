@@ -35,6 +35,7 @@ async fn main() {
     let config: Config = toml::from_str(&config_str).expect("invalid config file");
 
     let gapi = gitlab::GitlabBuilder::new(config.host, config.token)
+        .cert_insecure()
         .build_async()
         .await
         .expect("gitlab err");
