@@ -1,7 +1,7 @@
 use graphql_client::*;
 use tokio::sync::mpsc::{channel, Receiver};
 
-use crate::fetchers::pipelines::branch_pipelines_query::PipelineStatusEnum;
+pub use crate::fetchers::pipelines::branch_pipelines_query::PipelineStatusEnum;
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -15,7 +15,7 @@ struct BranchPipelinesQuery;
 pub struct BranchPipelineUpdate {
     pub project: String,
     pub branch: String,
-    pub states: Vec<bool>,
+    pub states: Vec<PipelineStatusEnum>,
 }
 
 pub(crate) fn branch_pipelines(
@@ -42,19 +42,13 @@ pub(crate) fn branch_pipelines(
                 .await
                 .expect("some data");
 
-            let mut result = Vec::new();
-
-            for project in resp.project.iter() {
-                if let Some(pipelines) = project.pipelines.as_ref().and_then(|p| p.nodes.as_ref()) {
-                    for pipeline in pipelines.iter().flatten() {
-                        match pipeline.status {
-                            PipelineStatusEnum::FAILED => result.push(false),
-                            PipelineStatusEnum::SUCCESS => result.push(true),
-                            _ => {}
-                        }
-                    }
-                }
-            }
+            let result = resp.project.into_iter()
+                .flat_map(|p| p.pipelines)
+                .flat_map(|p| p.nodes)
+                .flatten()
+                .filter_map(|p| p)
+                .map(|p| p.status)
+                .collect();
 
             sender
                 .send(BranchPipelineUpdate {

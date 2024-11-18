@@ -1,17 +1,13 @@
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, BorderType, Paragraph};
+use ratatui::widgets::{Block, BorderType};
 use ratatui::Frame;
-use std::collections::HashMap;
 use std::io;
 
 use clap::Args;
-use ratatui::backend::CrosstermBackend;
 
 use crate::events::*;
 use crate::fetchers::CiJobStatus;
 use crate::gitlab_ref::*;
-
-type Term = Terminal<CrosstermBackend<io::Stdout>>;
 
 #[derive(Debug, Args)]
 pub struct PipelineArgs {

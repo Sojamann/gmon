@@ -1,55 +1,69 @@
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, BorderType, Paragraph};
 use ratatui::Frame;
-use std::collections::BTreeMap;
 use std::io;
 
 use clap::Args;
 use ratatui::backend::CrosstermBackend;
 
 use crate::events::*;
+use crate::fetchers::pipelines::BranchPipelineUpdate;
+use crate::fetchers::pipelines::PipelineStatusEnum;
 use crate::gitlab_ref::*;
-
-type Term = Terminal<CrosstermBackend<io::Stdout>>;
 
 #[derive(Debug, Args)]
 pub struct PipelinesArgs {
-    #[clap(trailing_var_arg = true)]
-    gitlab_refs: Vec<GitlabRef>,
+    gitlab_ref: GitlabRef,
 }
 
-type Projects = BTreeMap<String, BTreeMap<String, Vec<bool>>>;
+struct App {
+    receiver: tokio::sync::mpsc::Receiver<BranchPipelineUpdate>,
+    project: Option<BranchPipelineUpdate>,
+}
 
-pub async fn run(gapi: gitlab::AsyncGitlab, mut terminal: Term, args: &PipelinesArgs) {
-    let amount = terminal.size().unwrap().width / 3;
-
-    let mut receivers: Vec<tokio::sync::mpsc::Receiver<crate::fetchers::BranchPipelineUpdate>> =
-        args.gitlab_refs
-            .iter()
-            .map(|r| match &r {
-                GitlabRef::Repo(repo) => todo!(),
-                GitlabRef::Branch(repo, branch) => {
-                    crate::fetchers::branch_pipelines(gapi.clone(), &repo, &branch, amount.into())
-                }
-            })
-            .collect();
-
-    let mut event_handler = EventHandler::new(250);
-    let mut projects: Projects = BTreeMap::new();
-    loop {
-        for receiver in receivers.iter_mut() {
-            // check if there is a new project update
-            if let Ok(p) = receiver.try_recv() {
-                let branches = projects.entry(p.project).or_insert(BTreeMap::new());
-                let states = branches.entry(p.branch).or_insert(Vec::new());
-                states.clear();
-                states.extend_from_slice(&p.states);
+impl App {
+    fn new(gapi: gitlab::AsyncGitlab, args: &PipelinesArgs) -> Self {
+        let receiver = match &args.gitlab_ref {
+            GitlabRef::Repo(repo) => todo!(),
+            GitlabRef::Branch(repo, branch) => {
+                crate::fetchers::branch_pipelines(gapi.clone(), &repo, &branch, 40)
             }
+        };
+
+        App {
+            receiver,
+            project: None,
         }
+    }
+
+    fn update(&mut self) {
+        // check if there is a new project update
+        if let Ok(p) = self.receiver.try_recv() {
+            self.project = Some(p);
+        }
+    }
+
+    fn render(&self, frame: &mut Frame) {
+        if let Some(p) = &self.project {
+            render(frame, p);
+        }
+    }
+}
+
+pub async fn run(gapi: gitlab::AsyncGitlab, args: &PipelinesArgs) {
+    let backend = ratatui::backend::CrosstermBackend::new(io::stdout());
+    let viewport = ratatui::Viewport::Inline(5);
+    let mut terminal =
+        ratatui::Terminal::with_options(backend, ratatui::TerminalOptions { viewport })
+            .expect("terminal setup to work");
+
+    let mut app = App::new(gapi, args);
+    let mut event_handler = EventHandler::new(250);
+
+    loop {
+        app.update();
         terminal
-            .draw(|frame| {
-                render(frame, &projects);
-            })
+            .draw(|frame| app.render(frame))
             .expect("failed to draw frame");
 
         match event_handler.next().await {
@@ -61,52 +75,30 @@ pub async fn run(gapi: gitlab::AsyncGitlab, mut terminal: Term, args: &Pipelines
     }
 }
 
-fn render(frame: &mut Frame, projects: &Projects) {
-    if projects.is_empty() {
-        return;
-    }
-
-    let layouts = Layout::default()
-        .constraints((0..projects.len()).into_iter().map(|_| Constraint::Min(3)))
-        .flex(layout::Flex::Center)
-        .split(frame.area());
-
-    for ((project, branches), &layout) in projects.iter().zip(layouts.iter()) {
-        render_project(frame, layout, project, branches);
-    }
-}
-fn render_project(
-    frame: &mut Frame,
-    area: Rect,
-    project: &str,
-    branches: &BTreeMap<String, Vec<bool>>,
-) {
-    // render the project outline
-    let block = Block::bordered()
+fn render(frame: &mut Frame, project: &BranchPipelineUpdate) {
+    let project_block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .title(project.to_string());
-    frame.render_widget(&block, area);
+        .title(project.project.clone());
+    frame.render_widget(&project_block, frame.area());
 
-    let layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints((0..branches.len()).into_iter().map(|_| Constraint::Max(3)))
-        .flex(layout::Flex::Center)
-        .split(block.inner(area));
+    let project_content_area = project_block.inner(frame.area());
 
-    branches
+    let line: Line = project
+        .states
         .iter()
-        .zip(layout.iter())
-        .for_each(|((branch, states), layout)| {
-            let line: Line = states
-                .iter()
-                .map(|ok| match ok {
-                    true => Span::styled("▄▄▄  ", Color::Green),
-                    false => Span::styled("▄▄▄  ", Color::Red),
-                })
-                .collect::<Vec<Span>>()
-                .into();
-            let paragraph = Paragraph::new(line).block(Block::bordered().title(branch.clone()));
-
-            frame.render_widget(paragraph, *layout);
+        .map(|ok| match ok {
+            PipelineStatusEnum::SUCCESS => Span::styled("▄▄▄  ", Color::Green),
+            PipelineStatusEnum::FAILED => Span::styled("▄▄▄  ", Color::Red),
+            PipelineStatusEnum::CREATED => Span::styled("▄▄▄  ", Modifier::DIM),
+            PipelineStatusEnum::SKIPPED => Span::styled("  »  ", Modifier::DIM),
+            _ => Span::from("▄▄▄  "),
         })
+        .collect::<Vec<Span>>()
+        .into();
+
+    let paragraph = Paragraph::new(line)
+        .centered()
+        .block(Block::bordered().title(project.branch.clone()));
+
+    frame.render_widget(paragraph, project_content_area);
 }

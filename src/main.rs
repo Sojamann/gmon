@@ -42,7 +42,7 @@ async fn main() {
 
     match &cli.command {
         Command::Pipelines(args) => {
-            cmds::pipelines::run(gapi, ratatui::init(), args).await;
+            cmds::pipelines::run(gapi, args).await;
         }
         Command::Pipeline(args) => {
             cmds::pipeline::run(gapi, args).await;
