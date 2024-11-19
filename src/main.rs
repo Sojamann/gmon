@@ -59,8 +59,10 @@ async fn main() {
             },
     };
 
-    std::panic::set_hook(Box::new(move |_| {
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
         ratatui::restore();
+        original_hook(info);
     }));
 
     match &cli.command {
