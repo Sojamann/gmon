@@ -61,6 +61,7 @@ async fn main() {
 
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
+        _ = ratatui::crossterm::terminal::disable_raw_mode();
         ratatui::restore();
         original_hook(info);
     }));
@@ -74,4 +75,5 @@ async fn main() {
         }
     }
     ratatui::restore();
+    let _ = ratatui::crossterm::terminal::disable_raw_mode();
 }

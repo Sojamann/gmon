@@ -1,10 +1,9 @@
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, BorderType, Paragraph};
+use ratatui::widgets::{Block, BorderType, Paragraph, Padding};
 use ratatui::Frame;
 use std::io;
 
 use clap::Args;
-use ratatui::backend::CrosstermBackend;
 
 use crate::events::*;
 use crate::fetchers::pipelines::BranchPipelineUpdate;
@@ -52,6 +51,7 @@ impl App {
 
 pub async fn run(gapi: gitlab::AsyncGitlab, args: &PipelinesArgs) {
     let backend = ratatui::backend::CrosstermBackend::new(io::stdout());
+    ratatui::crossterm::terminal::enable_raw_mode().expect("enable raw mode");
     let viewport = ratatui::Viewport::Inline(5);
     let mut terminal =
         ratatui::Terminal::with_options(backend, ratatui::TerminalOptions { viewport })
@@ -62,6 +62,7 @@ pub async fn run(gapi: gitlab::AsyncGitlab, args: &PipelinesArgs) {
 
     loop {
         app.update();
+        // ignoring all errors
         terminal
             .draw(|frame| app.render(frame))
             .expect("failed to draw frame");
@@ -87,18 +88,20 @@ fn render(frame: &mut Frame, project: &BranchPipelineUpdate) {
         .states
         .iter()
         .map(|ok| match ok {
-            PipelineStatusEnum::SUCCESS => Span::styled("▄▄▄  ", Color::Green),
-            PipelineStatusEnum::FAILED => Span::styled("▄▄▄  ", Color::Red),
-            PipelineStatusEnum::CREATED => Span::styled("▄▄▄  ", Modifier::DIM),
+            PipelineStatusEnum::SUCCESS => Span::styled(" ███ ", Color::Green),
+            PipelineStatusEnum::FAILED => Span::styled(" ███  ", Color::Red),
+            PipelineStatusEnum::CREATED => Span::styled(" ███ ", Color::Gray),
             PipelineStatusEnum::SKIPPED => Span::styled("  »  ", Modifier::DIM),
-            _ => Span::from("▄▄▄  "),
+            _ => Span::styled(" ███ ", Modifier::DIM),
         })
         .collect::<Vec<Span>>()
         .into();
 
-    let paragraph = Paragraph::new(line)
-        .centered()
-        .block(Block::bordered().title(project.branch.clone()));
+    let paragraph = Paragraph::new(line).centered().block(
+        Block::bordered()
+            .padding(Padding::horizontal(3))
+            .title(project.branch.clone()),
+    );
 
     frame.render_widget(paragraph, project_content_area);
 }

@@ -59,6 +59,7 @@ impl App {
 
 pub async fn run(gapi: gitlab::AsyncGitlab, args: &PipelineArgs) {
     let backend = ratatui::backend::CrosstermBackend::new(io::stdout());
+    ratatui::crossterm::terminal::enable_raw_mode().expect("enable raw mode");
     let viewport = ratatui::Viewport::Inline(15);
     let mut terminal =
         ratatui::Terminal::with_options(backend, ratatui::TerminalOptions { viewport })
