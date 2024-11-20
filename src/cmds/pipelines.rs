@@ -1,5 +1,5 @@
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, BorderType, Padding, Paragraph};
+use ratatui::widgets::{Block, Padding, Paragraph};
 use ratatui::Frame;
 use std::io;
 
@@ -8,6 +8,7 @@ use clap::Args;
 use crate::events::*;
 use crate::fetchers::pipelines::BranchPipelineUpdate;
 use crate::fetchers::pipelines::PipelineStatusEnum;
+use crate::fetchers::pipelines::PipelinesQueryArgs;
 use crate::gitlab_ref::*;
 
 #[derive(Debug, Args)]
@@ -23,10 +24,17 @@ struct App {
 impl App {
     fn new(gapi: gitlab::AsyncGitlab, args: &PipelinesArgs) -> Self {
         let receiver = match &args.gitlab_ref {
-            GitlabRef::Repo(repo) => todo!(),
-            GitlabRef::Branch(repo, branch) => {
-                crate::fetchers::branch_pipelines(gapi.clone(), &repo, &branch, 40)
-            }
+            GitlabRef::Repo(repo) => crate::fetchers::branch_pipelines(
+                gapi.clone(),
+                PipelinesQueryArgs::new(repo.clone()).with_count(30),
+            ),
+
+            GitlabRef::Branch(repo, branch) => crate::fetchers::branch_pipelines(
+                gapi.clone(),
+                PipelinesQueryArgs::new(repo.clone())
+                    .with_reference(branch.clone())
+                    .with_count(30),
+            ),
         };
 
         App {
@@ -108,7 +116,7 @@ fn render(frame: &mut Frame, project: &BranchPipelineUpdate) {
     let paragraph = Paragraph::new(line).centered().block(
         Block::bordered()
             .padding(Padding::horizontal(3))
-            .title(project.branch.clone()),
+            .title(project.branch.as_ref().unwrap_or(&"".to_string()).clone()),
     );
 
     frame.render_widget(paragraph, project_content_area);

@@ -8,41 +8,65 @@ pub use crate::fetchers::pipelines::branch_pipelines_query::PipelineStatusEnum;
     query_path = "graphql/pipelines.graphql",
     schema_path = "graphql/schema.json",
     variables_derives = "Debug",
-    response_derives = "Deserialize,Serialize,PartialEq,Debug"
+    response_derives = "Deserialize,Serialize,PartialEq,Debug,Clone"
 )]
 struct BranchPipelinesQuery;
 
 pub struct BranchPipelineUpdate {
     pub project: String,
-    pub branch: String,
+    pub branch: Option<String>,
     pub states: Vec<PipelineStatusEnum>,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct PipelinesQueryArgs {
+    project: String,
+    git_ref: Option<String>,
+    pipeline_count: Option<i64>,
+    pipeline_status: Option<PipelineStatusEnum>,
+}
+
+impl PipelinesQueryArgs {
+    pub fn new(project: String) -> Self {
+        return Self {
+            project,
+            ..Self::default()
+        };
+    }
+    pub fn with_reference(mut self, reference: String) -> Self {
+        self.git_ref = Some(reference);
+        self
+    }
+    pub fn with_count(mut self, count: i64) -> Self {
+        self.pipeline_count = Some(count);
+        self
+    }
+    pub fn with_status(mut self, status: PipelineStatusEnum) -> Self {
+        self.pipeline_status = Some(status);
+        self
+    }
 }
 
 pub(crate) fn branch_pipelines(
     gapi: gitlab::AsyncGitlab,
-    project: &str,
-    branch: &str,
-    amount: i64,
+    params: PipelinesQueryArgs,
 ) -> Receiver<BranchPipelineUpdate> {
     let (sender, receiver) = channel(1);
 
-    let project_name = project.to_string();
-    let branch_name = branch.to_string();
-
+    let variables = <BranchPipelinesQuery as GraphQLQuery>::Variables {
+        project: params.project.clone(),
+        branch: params.git_ref.clone(),
+        amount: params.pipeline_count,
+    };
+    let query = BranchPipelinesQuery::build_query(variables);
     tokio::spawn(async move {
-        let variables = <BranchPipelinesQuery as GraphQLQuery>::Variables {
-            project: project_name.clone(),
-            branch: branch_name.clone(),
-            amount,
-        };
-        let query = BranchPipelinesQuery::build_query(variables);
         loop {
             let resp: <BranchPipelinesQuery as GraphQLQuery>::ResponseData = gapi
                 .graphql::<BranchPipelinesQuery>(&query)
                 .await
                 .expect("some data");
 
-            let result = resp.project.into_iter()
+            let states: Vec<_> = resp.project.into_iter()
                 .flat_map(|p| p.pipelines)
                 .flat_map(|p| p.nodes)
                 .flatten()
@@ -52,9 +76,9 @@ pub(crate) fn branch_pipelines(
 
             sender
                 .send(BranchPipelineUpdate {
-                    project: project_name.clone(),
-                    branch: branch_name.clone(),
-                    states: result,
+                    project: params.project.clone(),
+                    branch: params.git_ref.clone(),
+                    states,
                 })
                 .await
                 .unwrap();
