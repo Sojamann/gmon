@@ -1,5 +1,5 @@
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, BorderType, Paragraph, Padding};
+use ratatui::widgets::{Block, BorderType, Padding, Paragraph};
 use ratatui::Frame;
 use std::io;
 
@@ -77,22 +77,30 @@ pub async fn run(gapi: gitlab::AsyncGitlab, args: &PipelinesArgs) {
 }
 
 fn render(frame: &mut Frame, project: &BranchPipelineUpdate) {
-    let project_block = Block::bordered()
-        .border_type(BorderType::Rounded)
-        .title(project.project.clone());
+    let project_block = Block::bordered().title(project.project.clone());
     frame.render_widget(&project_block, frame.area());
 
     let project_content_area = project_block.inner(frame.area());
 
+    let pipeline_block = " ███ ";
     let line: Line = project
         .states
         .iter()
         .map(|ok| match ok {
-            PipelineStatusEnum::SUCCESS => Span::styled(" ███ ", Color::Green),
-            PipelineStatusEnum::FAILED => Span::styled(" ███  ", Color::Red),
-            PipelineStatusEnum::CREATED => Span::styled(" ███ ", Color::Gray),
+            PipelineStatusEnum::SUCCESS => Span::styled(pipeline_block, Color::Green),
+            PipelineStatusEnum::FAILED => Span::styled(pipeline_block, Color::Red),
+            PipelineStatusEnum::CREATED => Span::gray(pipeline_block.into()),
+            PipelineStatusEnum::RUNNING => Span::blue(pipeline_block.into()),
             PipelineStatusEnum::SKIPPED => Span::styled("  »  ", Modifier::DIM),
-            _ => Span::styled(" ███ ", Modifier::DIM),
+            PipelineStatusEnum::CANCELED => Span::from("  ☠  "),
+            PipelineStatusEnum::MANUAL => Span::from("  👋  "),
+            PipelineStatusEnum::SCHEDULED => Span::from("  🕔 "),
+            PipelineStatusEnum::PENDING => Span::styled(pipeline_block, Modifier::DIM),
+            PipelineStatusEnum::CANCELING => Span::styled(pipeline_block, Modifier::DIM),
+            PipelineStatusEnum::PREPARING => Span::styled(pipeline_block, Modifier::DIM),
+            PipelineStatusEnum::WAITING_FOR_RESOURCE => Span::styled(pipeline_block, Modifier::DIM),
+            PipelineStatusEnum::WAITING_FOR_CALLBACK => Span::styled(pipeline_block, Modifier::DIM),
+            PipelineStatusEnum::Other(_) => Span::styled(pipeline_block, Modifier::DIM),
         })
         .collect::<Vec<Span>>()
         .into();
