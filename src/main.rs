@@ -6,6 +6,7 @@ use std::process;
 use clap::{Parser, Subcommand};
 
 mod cmds;
+mod theme;
 mod config;
 mod events;
 mod fetchers;

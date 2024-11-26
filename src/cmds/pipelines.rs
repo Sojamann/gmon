@@ -6,6 +6,8 @@ use std::io;
 use clap::Args;
 
 use crate::events::*;
+use crate::theme::Theme;
+use crate::theme;
 use crate::fetchers::pipelines::BranchPipelineUpdate;
 use crate::fetchers::pipelines::PipelineStatusEnum;
 use crate::fetchers::pipelines::PipelinesQueryArgs;
@@ -95,8 +97,8 @@ fn render(frame: &mut Frame, project: &BranchPipelineUpdate) {
         .states
         .iter()
         .map(|ok| match ok {
-            PipelineStatusEnum::SUCCESS => Span::styled(pipeline_block, Color::Green),
-            PipelineStatusEnum::FAILED => Span::styled(pipeline_block, Color::Red),
+            PipelineStatusEnum::SUCCESS => Span::styled(pipeline_block, theme::Catpuccin::green()),
+            PipelineStatusEnum::FAILED => Span::styled(pipeline_block, theme::Catpuccin::red()),
             PipelineStatusEnum::CREATED => Span::gray(pipeline_block.into()),
             PipelineStatusEnum::RUNNING => Span::blue(pipeline_block.into()),
             PipelineStatusEnum::SKIPPED => Span::styled("  »  ", Modifier::DIM),
