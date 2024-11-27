@@ -6,12 +6,12 @@ use std::io;
 use clap::Args;
 
 use crate::events::*;
-use crate::theme::Theme;
-use crate::theme;
 use crate::fetchers::pipelines::BranchPipelineUpdate;
 use crate::fetchers::pipelines::PipelineStatusEnum;
 use crate::fetchers::pipelines::PipelinesQueryArgs;
 use crate::gitlab_ref::*;
+use crate::theme;
+use crate::theme::Theme;
 
 #[derive(Debug, Args)]
 pub struct PipelinesArgs {
@@ -87,7 +87,7 @@ pub async fn run(gapi: gitlab::AsyncGitlab, args: &PipelinesArgs) {
 }
 
 fn render(frame: &mut Frame, project: &BranchPipelineUpdate) {
-    let project_block = Block::bordered().title(project.project.clone());
+    let project_block = theme::Catpuccin.block().title(project.project.clone());
     frame.render_widget(&project_block, frame.area());
 
     let project_content_area = project_block.inner(frame.area());
@@ -99,9 +99,9 @@ fn render(frame: &mut Frame, project: &BranchPipelineUpdate) {
         .map(|ok| match ok {
             PipelineStatusEnum::SUCCESS => Span::styled(pipeline_block, theme::Catpuccin::green()),
             PipelineStatusEnum::FAILED => Span::styled(pipeline_block, theme::Catpuccin::red()),
-            PipelineStatusEnum::CREATED => Span::gray(pipeline_block.into()),
-            PipelineStatusEnum::RUNNING => Span::blue(pipeline_block.into()),
-            PipelineStatusEnum::SKIPPED => Span::styled("  »  ", Modifier::DIM),
+            PipelineStatusEnum::CREATED => Span::styled(pipeline_block, theme::Catpuccin::text()),
+            PipelineStatusEnum::RUNNING => Span::styled(pipeline_block, theme::Catpuccin::blue()),
+            PipelineStatusEnum::SKIPPED => Span::styled("  »  ", theme::Catpuccin::text()),
             PipelineStatusEnum::CANCELED => Span::from("  ☠  "),
             PipelineStatusEnum::MANUAL => Span::from("  👋  "),
             PipelineStatusEnum::SCHEDULED => Span::from("  🕔 "),
@@ -116,7 +116,8 @@ fn render(frame: &mut Frame, project: &BranchPipelineUpdate) {
         .into();
 
     let paragraph = Paragraph::new(line).centered().block(
-        Block::bordered()
+        theme::Catpuccin
+            .block()
             .padding(Padding::horizontal(3))
             .title(project.branch.as_ref().unwrap_or(&"".to_string()).clone()),
     );

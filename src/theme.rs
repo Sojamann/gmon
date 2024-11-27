@@ -11,7 +11,8 @@ pub trait Theme {
 
     fn block(&self) -> Block {
         Block::bordered()
-            .border_type(BorderType::Rounded)
+            .border_type(BorderType::Thick)
+            .border_style(Self::text())
             .style(Self::background())
             .title_style(Self::text())
     }
